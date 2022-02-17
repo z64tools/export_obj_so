@@ -114,95 +114,6 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
                 fw("map_Kd %s\n" % repr(filepath)[1:-1])
 
 
-def test_nurbs_compat(ob):
-    if ob.type != "CURVE":
-        return False
-
-    for nu in ob.data.splines:
-        if (
-            nu.point_count_v == 1 and nu.type != "BEZIER"
-        ):  # not a surface and not bezier
-            return True
-
-    return False
-
-
-def write_nurb(fw, ob, ob_mat):
-    tot_verts = 0
-    cu = ob.data
-
-    # use negative indices
-    for nu in cu.splines:
-        if nu.type == "POLY":
-            DEG_ORDER_U = 1
-        else:
-            DEG_ORDER_U = nu.order_u - 1  # odd but tested to be correct
-
-        if nu.type == "BEZIER":
-            print(
-                "\tWarning, bezier curve:",
-                ob.name,
-                "only poly and nurbs curves supported",
-            )
-            continue
-
-        if nu.point_count_v > 1:
-            print(
-                "\tWarning, surface:", ob.name, "only poly and nurbs curves supported"
-            )
-            continue
-
-        if len(nu.points) <= DEG_ORDER_U:
-            print("\tWarning, order_u is lower then vert count, skipping:", ob.name)
-            continue
-
-        pt_num = 0
-        do_closed = nu.use_cyclic_u
-        do_endpoints = (do_closed == 0) and nu.use_endpoint_u
-
-        for pt in nu.points:
-            fw("v %.6f %.6f %.6f\n" % (ob_mat @ pt.co.to_3d())[:])
-            pt_num += 1
-        tot_verts += pt_num
-
-        fw(
-            "g %s\n" % (name_compat(ob.name))
-        )  # name_compat(ob.getData(1)) could use the data name too
-        fw("cstype bspline\n")  # not ideal, hard coded
-        fw("deg %d\n" % DEG_ORDER_U)  # not used for curves but most files have it still
-
-        curve_ls = [-(i + 1) for i in range(pt_num)]
-
-        # 'curv' keyword
-        if do_closed:
-            if DEG_ORDER_U == 1:
-                pt_num += 1
-                curve_ls.append(-1)
-            else:
-                pt_num += DEG_ORDER_U
-                curve_ls = curve_ls + curve_ls[0:DEG_ORDER_U]
-
-        fw(
-            "curv 0.0 1.0 %s\n" % (" ".join([str(i) for i in curve_ls]))
-        )  # Blender has no U and V values for the curve
-
-        # 'parm' keyword
-        tot_parm = (DEG_ORDER_U + 1) + pt_num
-        tot_parm_div = float(tot_parm - 1)
-        parm_ls = [(i / tot_parm_div) for i in range(tot_parm)]
-
-        if do_endpoints:  # end points, force param
-            for i in range(DEG_ORDER_U + 1):
-                parm_ls[i] = 0.0
-                parm_ls[-(1 + i)] = 1.0
-
-        fw("parm u %s\n" % " ".join(["%.6f" % i for i in parm_ls]))
-
-        fw("end\n")
-
-    return tot_verts
-
-
 def write_file(
     filepath,
     objects,
@@ -222,7 +133,6 @@ def write_file(
     EXPORT_GROUP_BY_MAT=False,
     EXPORT_KEEP_VERT_ORDER=False,
     EXPORT_POLYGROUPS=False,
-    EXPORT_CURVE_AS_NURBS=True,
     EXPORT_GLOBAL_MATRIX=None,
     EXPORT_PATH_MODE="AUTO",
     progress=ProgressReport(),
@@ -322,13 +232,6 @@ def write_file(
                 for ob, ob_mat in obs:
                     with ProgressReportSubstep(subprogress1, 6) as subprogress2:
                         uv_unique_count = no_unique_count = 0
-
-                        # Nurbs curve support
-                        if EXPORT_CURVE_AS_NURBS and test_nurbs_compat(ob):
-                            ob_mat = EXPORT_GLOBAL_MATRIX @ ob_mat
-                            totverts += write_nurb(fw, ob, ob_mat)
-                            continue
-                        # END NURBS
 
                         ob_for_convert = (
                             ob.evaluated_get(depsgraph)
@@ -746,7 +649,6 @@ def _write(
     EXPORT_GROUP_BY_MAT,
     EXPORT_KEEP_VERT_ORDER,
     EXPORT_POLYGROUPS,
-    EXPORT_CURVE_AS_NURBS,
     EXPORT_SEL_ONLY,  # ok
     EXPORT_GLOBAL_MATRIX,
     EXPORT_PATH_MODE,  # Not used
@@ -786,7 +688,6 @@ def _write(
             EXPORT_GROUP_BY_MAT,
             EXPORT_KEEP_VERT_ORDER,
             EXPORT_POLYGROUPS,
-            EXPORT_CURVE_AS_NURBS,
             EXPORT_GLOBAL_MATRIX,
             EXPORT_PATH_MODE,
             progress,
@@ -819,7 +720,6 @@ def save(
     group_by_material=False,
     keep_vertex_order=False,
     use_vertex_groups=False,
-    use_nurbs=True,
     use_selection=True,
     global_matrix=None,
     path_mode="AUTO"
@@ -842,7 +742,6 @@ def save(
         EXPORT_GROUP_BY_MAT=group_by_material,
         EXPORT_KEEP_VERT_ORDER=keep_vertex_order,
         EXPORT_POLYGROUPS=use_vertex_groups,
-        EXPORT_CURVE_AS_NURBS=use_nurbs,
         EXPORT_SEL_ONLY=use_selection,
         EXPORT_GLOBAL_MATRIX=global_matrix,
         EXPORT_PATH_MODE=path_mode,
@@ -913,12 +812,6 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
     use_triangles: BoolProperty(
         name="Triangulate Faces",
         description="Convert all faces to triangles",
-        default=False,
-    )
-    use_nurbs: BoolProperty(
-        name="Write Nurbs",
-        description="Write nurbs curves as OBJ nurbs rather than "
-        "converting to geometry",
         default=False,
     )
     use_vertex_groups: BoolProperty(
@@ -1075,7 +968,6 @@ class EXPORT_OBJ_SO_PT_export_geometry(bpy.types.Panel):
         layout.prop(operator, "use_uvs")
         layout.prop(operator, "use_materials")
         layout.prop(operator, "use_triangles")
-        layout.prop(operator, "use_nurbs", text="Curves as NURBS")
         layout.prop(operator, "use_vertex_groups")
         layout.prop(operator, "keep_vertex_order")
 
