@@ -123,8 +123,7 @@ def write_file(
     EXPORT_UV=True,
     EXPORT_MTL=True,
     EXPORT_APPLY_MODIFIERS=True,
-    EXPORT_BLEN_OBS=True,
-    EXPORT_GROUP_BY_OB=False,
+    EXPORT_GROUP_BY_OB=True,
     EXPORT_GROUP_BY_MAT=False,
     EXPORT_KEEP_VERT_ORDER=False,
     EXPORT_POLYGROUPS=False,
@@ -303,7 +302,7 @@ def write_file(
                             0,
                         )  # Can never be this, so we will label a new material the first chance we get.
 
-                        if EXPORT_BLEN_OBS or EXPORT_GROUP_BY_OB:
+                        if EXPORT_GROUP_BY_OB:
                             name1 = ob.name
                             name2 = ob.data.name
                             if name1 == name2:
@@ -314,10 +313,7 @@ def write_file(
                                     name_compat(name2),
                                 )
 
-                            if EXPORT_BLEN_OBS:
-                                fw("o %s\n" % obnamestring)  # Write Object name
-                            else:  # if EXPORT_GROUP_BY_OB:
-                                fw("g %s\n" % obnamestring)
+                            fw("g %s\n" % obnamestring)
 
                         subprogress2.step()
 
@@ -571,7 +567,6 @@ def _write(
     EXPORT_UV,  # ok
     EXPORT_MTL,
     EXPORT_APPLY_MODIFIERS,  # ok
-    EXPORT_BLEN_OBS,
     EXPORT_GROUP_BY_OB,
     EXPORT_GROUP_BY_MAT,
     EXPORT_KEEP_VERT_ORDER,
@@ -605,7 +600,6 @@ def _write(
             EXPORT_UV,
             EXPORT_MTL,
             EXPORT_APPLY_MODIFIERS,
-            EXPORT_BLEN_OBS,
             EXPORT_GROUP_BY_OB,
             EXPORT_GROUP_BY_MAT,
             EXPORT_KEEP_VERT_ORDER,
@@ -632,8 +626,7 @@ def save(
     use_uvs=True,
     use_materials=True,
     use_mesh_modifiers=True,
-    use_blen_objects=True,
-    group_by_object=False,
+    group_by_object=True,
     group_by_material=False,
     keep_vertex_order=False,
     use_vertex_groups=False,
@@ -649,7 +642,6 @@ def save(
         EXPORT_UV=use_uvs,
         EXPORT_MTL=use_materials,
         EXPORT_APPLY_MODIFIERS=use_mesh_modifiers,
-        EXPORT_BLEN_OBS=use_blen_objects,
         EXPORT_GROUP_BY_OB=group_by_object,
         EXPORT_GROUP_BY_MAT=group_by_material,
         EXPORT_KEEP_VERT_ORDER=keep_vertex_order,
@@ -712,15 +704,10 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
     )
 
     # grouping group
-    use_blen_objects: BoolProperty(
-        name="OBJ Objects",
-        description="Export Blender objects as OBJ objects",
-        default=True,
-    )
     group_by_object: BoolProperty(
         name="OBJ Groups",
         description="Export Blender objects as OBJ groups",
-        default=False,
+        default=True,
     )
     group_by_material: BoolProperty(
         name="Material Groups",
@@ -798,7 +785,6 @@ class EXPORT_OBJ_SO_PT_export_include(bpy.types.Panel):
         col.prop(operator, "use_selection")
 
         col = layout.column(heading="Objects as", align=True)
-        col.prop(operator, "use_blen_objects")
         col.prop(operator, "group_by_object")
         col.prop(operator, "group_by_material")
 
