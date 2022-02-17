@@ -119,7 +119,6 @@ def write_file(
     objects,
     depsgraph,
     scene,
-    EXPORT_TRI=False,
     EXPORT_NORMALS=False,
     EXPORT_UV=True,
     EXPORT_MTL=True,
@@ -244,9 +243,8 @@ def write_file(
                             continue
 
                         # _must_ do this before applying transformation, else tessellation may differ
-                        if EXPORT_TRI:
-                            # _must_ do this first since it re-allocs arrays
-                            mesh_triangulate(me)
+                        # _must_ do this first since it re-allocs arrays
+                        mesh_triangulate(me)
 
                         me.transform(EXPORT_GLOBAL_MATRIX @ ob_mat)
                         # If negative scaling, we have to invert the normals...
@@ -569,7 +567,6 @@ def write_file(
 def _write(
     context,
     filepath,
-    EXPORT_TRI,  # ok
     EXPORT_NORMALS,  # ok
     EXPORT_UV,  # ok
     EXPORT_MTL,
@@ -604,7 +601,6 @@ def _write(
             objects,
             depsgraph,
             scene,
-            EXPORT_TRI,
             EXPORT_NORMALS,
             EXPORT_UV,
             EXPORT_MTL,
@@ -632,7 +628,6 @@ def save(
     context,
     filepath,
     *,
-    use_triangles=False,
     use_normals=False,
     use_uvs=True,
     use_materials=True,
@@ -650,7 +645,6 @@ def save(
     _write(
         context,
         filepath,
-        EXPORT_TRI=use_triangles,
         EXPORT_NORMALS=use_normals,
         EXPORT_UV=use_uvs,
         EXPORT_MTL=use_materials,
@@ -710,11 +704,6 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
         name="Write Materials",
         description="Write out the MTL file",
         default=True,
-    )
-    use_triangles: BoolProperty(
-        name="Triangulate Faces",
-        description="Convert all faces to triangles",
-        default=False,
     )
     use_vertex_groups: BoolProperty(
         name="Polygroups",
@@ -867,7 +856,6 @@ class EXPORT_OBJ_SO_PT_export_geometry(bpy.types.Panel):
         layout.prop(operator, "use_normals")
         layout.prop(operator, "use_uvs")
         layout.prop(operator, "use_materials")
-        layout.prop(operator, "use_triangles")
         layout.prop(operator, "use_vertex_groups")
         layout.prop(operator, "keep_vertex_order")
 
