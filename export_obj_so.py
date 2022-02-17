@@ -120,8 +120,6 @@ def write_file(
     depsgraph,
     scene,
     EXPORT_TRI=False,
-    EXPORT_SMOOTH_GROUPS=False,
-    EXPORT_SMOOTH_GROUPS_BITFLAGS=False,
     EXPORT_NORMALS=False,
     EXPORT_UV=True,
     EXPORT_MTL=True,
@@ -282,17 +280,6 @@ def write_file(
 
                         loops = me.loops
 
-                        if (
-                            EXPORT_SMOOTH_GROUPS or EXPORT_SMOOTH_GROUPS_BITFLAGS
-                        ) and face_index_pairs:
-                            smooth_groups, smooth_groups_tot = me.calc_smooth_groups(
-                                use_bitflags=EXPORT_SMOOTH_GROUPS_BITFLAGS
-                            )
-                            if smooth_groups_tot <= 1:
-                                smooth_groups, smooth_groups_tot = (), 0
-                        else:
-                            smooth_groups, smooth_groups_tot = (), 0
-
                         materials = me.materials[:]
                         material_names = [m.name if m else None for m in materials]
 
@@ -307,37 +294,16 @@ def write_file(
                             pass
                         else:
                             if len(materials) > 1:
-                                if smooth_groups:
-                                    sort_func = lambda a: (
-                                        a[0].material_index,
-                                        smooth_groups[a[1]]
-                                        if a[0].use_smooth
-                                        else False,
-                                    )
-                                else:
-                                    sort_func = lambda a: (
-                                        a[0].material_index,
-                                        a[0].use_smooth,
-                                    )
+                                face_index_pairs.sort(key=lambda a: a[0].material_index)
                             else:
                                 # no materials
-                                if smooth_groups:
-                                    sort_func = lambda a: smooth_groups[
-                                        a[1] if a[0].use_smooth else False
-                                    ]
-                                else:
-                                    sort_func = lambda a: a[0].use_smooth
-
-                            face_index_pairs.sort(key=sort_func)
-
-                            del sort_func
+                                pass
 
                         # Set the default mat to no material and no image.
                         contextMat = (
                             0,
                             0,
                         )  # Can never be this, so we will label a new material the first chance we get.
-                        contextSmooth = None  # Will either be true or false,  set bad to force initialization switch.
 
                         if EXPORT_BLEN_OBS or EXPORT_GROUP_BY_OB:
                             name1 = ob.name
@@ -442,9 +408,6 @@ def write_file(
                                     ]
 
                         for f, f_index in face_index_pairs:
-                            f_smooth = f.use_smooth
-                            if f_smooth and smooth_groups:
-                                f_smooth = smooth_groups[f_index]
                             f_mat = min(f.material_index, len(materials) - 1)
 
                             # MAKE KEY
@@ -530,16 +493,6 @@ def write_file(
                                         )  # can be mat_image or (null)
 
                             contextMat = key
-                            if f_smooth != contextSmooth:
-                                if f_smooth:  # on now off
-                                    if smooth_groups:
-                                        f_smooth = smooth_groups[f_index]
-                                        fw("s %d\n" % f_smooth)
-                                    else:
-                                        fw("s 1\n")
-                                else:  # was off now on
-                                    fw("s off\n")
-                                contextSmooth = f_smooth
 
                             f_v = [
                                 (vi, me_verts[v_idx], l_idx)
@@ -617,8 +570,6 @@ def _write(
     context,
     filepath,
     EXPORT_TRI,  # ok
-    EXPORT_SMOOTH_GROUPS,
-    EXPORT_SMOOTH_GROUPS_BITFLAGS,
     EXPORT_NORMALS,  # ok
     EXPORT_UV,  # ok
     EXPORT_MTL,
@@ -654,8 +605,6 @@ def _write(
             depsgraph,
             scene,
             EXPORT_TRI,
-            EXPORT_SMOOTH_GROUPS,
-            EXPORT_SMOOTH_GROUPS_BITFLAGS,
             EXPORT_NORMALS,
             EXPORT_UV,
             EXPORT_MTL,
@@ -685,8 +634,6 @@ def save(
     *,
     use_triangles=False,
     use_normals=False,
-    use_smooth_groups=False,
-    use_smooth_groups_bitflags=False,
     use_uvs=True,
     use_materials=True,
     use_mesh_modifiers=True,
@@ -704,8 +651,6 @@ def save(
         context,
         filepath,
         EXPORT_TRI=use_triangles,
-        EXPORT_SMOOTH_GROUPS=use_smooth_groups,
-        EXPORT_SMOOTH_GROUPS_BITFLAGS=use_smooth_groups_bitflags,
         EXPORT_NORMALS=use_normals,
         EXPORT_UV=use_uvs,
         EXPORT_MTL=use_materials,
@@ -751,17 +696,6 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
         default=True,
     )
     # extra data group
-    use_smooth_groups: BoolProperty(
-        name="Smooth Groups",
-        description="Write sharp edges as smooth groups",
-        default=False,
-    )
-    use_smooth_groups_bitflags: BoolProperty(
-        name="Bitflag Smooth Groups",
-        description="Same as 'Smooth Groups', but generate smooth groups IDs as bitflags "
-        "(produces at most 32 different smooth groups, usually much less)",
-        default=False,
-    )
     use_normals: BoolProperty(
         name="Write Normals",
         description="Export one normal per vertex and per face, to represent flat faces and sharp edges",
@@ -930,8 +864,6 @@ class EXPORT_OBJ_SO_PT_export_geometry(bpy.types.Panel):
         operator = sfile.active_operator
 
         layout.prop(operator, "use_mesh_modifiers")
-        layout.prop(operator, "use_smooth_groups")
-        layout.prop(operator, "use_smooth_groups_bitflags")
         layout.prop(operator, "use_normals")
         layout.prop(operator, "use_uvs")
         layout.prop(operator, "use_materials")
