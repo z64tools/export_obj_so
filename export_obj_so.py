@@ -127,7 +127,6 @@ def write_file(
     EXPORT_UV=True,
     EXPORT_MTL=True,
     EXPORT_APPLY_MODIFIERS=True,
-    EXPORT_APPLY_MODIFIERS_RENDER=False,
     EXPORT_BLEN_OBS=True,
     EXPORT_GROUP_BY_OB=False,
     EXPORT_GROUP_BY_MAT=False,
@@ -643,7 +642,6 @@ def _write(
     EXPORT_UV,  # ok
     EXPORT_MTL,
     EXPORT_APPLY_MODIFIERS,  # ok
-    EXPORT_APPLY_MODIFIERS_RENDER,  # ok
     EXPORT_BLEN_OBS,
     EXPORT_GROUP_BY_OB,
     EXPORT_GROUP_BY_MAT,
@@ -682,7 +680,6 @@ def _write(
             EXPORT_UV,
             EXPORT_MTL,
             EXPORT_APPLY_MODIFIERS,
-            EXPORT_APPLY_MODIFIERS_RENDER,
             EXPORT_BLEN_OBS,
             EXPORT_GROUP_BY_OB,
             EXPORT_GROUP_BY_MAT,
@@ -714,7 +711,6 @@ def save(
     use_uvs=True,
     use_materials=True,
     use_mesh_modifiers=True,
-    use_mesh_modifiers_render=False,
     use_blen_objects=True,
     group_by_object=False,
     group_by_material=False,
@@ -736,7 +732,6 @@ def save(
         EXPORT_UV=use_uvs,
         EXPORT_MTL=use_materials,
         EXPORT_APPLY_MODIFIERS=use_mesh_modifiers,
-        EXPORT_APPLY_MODIFIERS_RENDER=use_mesh_modifiers_render,
         EXPORT_BLEN_OBS=use_blen_objects,
         EXPORT_GROUP_BY_OB=group_by_object,
         EXPORT_GROUP_BY_MAT=group_by_material,
