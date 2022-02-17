@@ -836,20 +836,11 @@ def _write(
     EXPORT_POLYGROUPS,
     EXPORT_CURVE_AS_NURBS,
     EXPORT_SEL_ONLY,  # ok
-    EXPORT_ANIMATION,
     EXPORT_GLOBAL_MATRIX,
     EXPORT_PATH_MODE,  # Not used
 ):
 
     with ProgressReport(context.window_manager) as progress:
-        base_name, ext = os.path.splitext(filepath)
-        context_name = [
-            base_name,
-            "",
-            "",
-            ext,
-        ]  # Base name, scene name, frame number, extension
-
         depsgraph = context.evaluated_depsgraph_get()
         scene = context.scene
 
@@ -857,60 +848,37 @@ def _write(
         if bpy.ops.object.mode_set.poll():
             bpy.ops.object.mode_set(mode="OBJECT")
 
-        orig_frame = scene.frame_current
-
-        # Export an animation?
-        if EXPORT_ANIMATION:
-            scene_frames = range(
-                scene.frame_start, scene.frame_end + 1
-            )  # Up to and including the end frame.
+        if EXPORT_SEL_ONLY:
+            objects = context.selected_objects
         else:
-            scene_frames = [orig_frame]  # Dont export an animation.
+            objects = scene.objects
 
-        # Loop through all frames in the scene and export.
-        progress.enter_substeps(len(scene_frames))
-        for frame in scene_frames:
-            if EXPORT_ANIMATION:  # Add frame to the filepath.
-                context_name[2] = "_%.6d" % frame
-
-            scene.frame_set(frame, subframe=0.0)
-            if EXPORT_SEL_ONLY:
-                objects = context.selected_objects
-            else:
-                objects = scene.objects
-
-            full_path = "".join(context_name)
-
-            # erm... bit of a problem here, this can overwrite files when exporting frames. not too bad.
-            # EXPORT THE FILE.
-            progress.enter_substeps(1)
-            write_file(
-                full_path,
-                objects,
-                depsgraph,
-                scene,
-                EXPORT_TRI,
-                EXPORT_EDGES,
-                EXPORT_SMOOTH_GROUPS,
-                EXPORT_SMOOTH_GROUPS_BITFLAGS,
-                EXPORT_NORMALS,
-                EXPORT_UV,
-                EXPORT_MTL,
-                EXPORT_APPLY_MODIFIERS,
-                EXPORT_APPLY_MODIFIERS_RENDER,
-                EXPORT_BLEN_OBS,
-                EXPORT_GROUP_BY_OB,
-                EXPORT_GROUP_BY_MAT,
-                EXPORT_KEEP_VERT_ORDER,
-                EXPORT_POLYGROUPS,
-                EXPORT_CURVE_AS_NURBS,
-                EXPORT_GLOBAL_MATRIX,
-                EXPORT_PATH_MODE,
-                progress,
-            )
-            progress.leave_substeps()
-
-        scene.frame_set(orig_frame, subframe=0.0)
+        # EXPORT THE FILE.
+        progress.enter_substeps(1)
+        write_file(
+            filepath,
+            objects,
+            depsgraph,
+            scene,
+            EXPORT_TRI,
+            EXPORT_EDGES,
+            EXPORT_SMOOTH_GROUPS,
+            EXPORT_SMOOTH_GROUPS_BITFLAGS,
+            EXPORT_NORMALS,
+            EXPORT_UV,
+            EXPORT_MTL,
+            EXPORT_APPLY_MODIFIERS,
+            EXPORT_APPLY_MODIFIERS_RENDER,
+            EXPORT_BLEN_OBS,
+            EXPORT_GROUP_BY_OB,
+            EXPORT_GROUP_BY_MAT,
+            EXPORT_KEEP_VERT_ORDER,
+            EXPORT_POLYGROUPS,
+            EXPORT_CURVE_AS_NURBS,
+            EXPORT_GLOBAL_MATRIX,
+            EXPORT_PATH_MODE,
+            progress,
+        )
         progress.leave_substeps()
 
 
@@ -941,7 +909,6 @@ def save(
     use_vertex_groups=False,
     use_nurbs=True,
     use_selection=True,
-    use_animation=False,
     global_matrix=None,
     path_mode="AUTO"
 ):
@@ -965,7 +932,6 @@ def save(
         EXPORT_POLYGROUPS=use_vertex_groups,
         EXPORT_CURVE_AS_NURBS=use_nurbs,
         EXPORT_SEL_ONLY=use_selection,
-        EXPORT_ANIMATION=use_animation,
         EXPORT_GLOBAL_MATRIX=global_matrix,
         EXPORT_PATH_MODE=path_mode,
     )
@@ -991,11 +957,6 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
     use_selection: BoolProperty(
         name="Selection Only",
         description="Export selected objects only",
-        default=False,
-    )
-    use_animation: BoolProperty(
-        name="Animation",
-        description="Write out an OBJ for each frame",
         default=False,
     )
 
@@ -1144,10 +1105,6 @@ class EXPORT_OBJ_SO_PT_export_include(bpy.types.Panel):
         col.prop(operator, "use_blen_objects")
         col.prop(operator, "group_by_object")
         col.prop(operator, "group_by_material")
-
-        layout.separator()
-
-        layout.prop(operator, "use_animation")
 
 
 class EXPORT_OBJ_SO_PT_export_transform(bpy.types.Panel):
