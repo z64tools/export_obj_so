@@ -120,7 +120,6 @@ def write_file(
     depsgraph,
     scene,
     EXPORT_TRI=False,
-    EXPORT_EDGES=False,
     EXPORT_SMOOTH_GROUPS=False,
     EXPORT_SMOOTH_GROUPS_BITFLAGS=False,
     EXPORT_NORMALS=False,
@@ -270,13 +269,8 @@ def write_file(
                             (face, index) for index, face in enumerate(me.polygons)
                         ]
 
-                        if EXPORT_EDGES:
-                            edges = me.edges
-                        else:
-                            edges = []
-
                         if not (
-                            len(face_index_pairs) + len(edges) + len(me.vertices)
+                            len(face_index_pairs) + len(me.vertices)
                         ):  # Make sure there is something to write
                             # clean up
                             ob_for_convert.to_mesh_clear()
@@ -596,18 +590,6 @@ def write_file(
 
                         subprogress2.step()
 
-                        # Write edges.
-                        if EXPORT_EDGES:
-                            for ed in edges:
-                                if ed.is_loose:
-                                    fw(
-                                        "l %d %d\n"
-                                        % (
-                                            totverts + ed.vertices[0],
-                                            totverts + ed.vertices[1],
-                                        )
-                                    )
-
                         # Make the indices global rather then per mesh
                         totverts += len(me_verts)
                         totuvco += uv_unique_count
@@ -635,7 +617,6 @@ def _write(
     context,
     filepath,
     EXPORT_TRI,  # ok
-    EXPORT_EDGES,
     EXPORT_SMOOTH_GROUPS,
     EXPORT_SMOOTH_GROUPS_BITFLAGS,
     EXPORT_NORMALS,  # ok
@@ -673,7 +654,6 @@ def _write(
             depsgraph,
             scene,
             EXPORT_TRI,
-            EXPORT_EDGES,
             EXPORT_SMOOTH_GROUPS,
             EXPORT_SMOOTH_GROUPS_BITFLAGS,
             EXPORT_NORMALS,
@@ -704,7 +684,6 @@ def save(
     filepath,
     *,
     use_triangles=False,
-    use_edges=True,
     use_normals=False,
     use_smooth_groups=False,
     use_smooth_groups_bitflags=False,
@@ -725,7 +704,6 @@ def save(
         context,
         filepath,
         EXPORT_TRI=use_triangles,
-        EXPORT_EDGES=use_edges,
         EXPORT_SMOOTH_GROUPS=use_smooth_groups,
         EXPORT_SMOOTH_GROUPS_BITFLAGS=use_smooth_groups_bitflags,
         EXPORT_NORMALS=use_normals,
@@ -773,11 +751,6 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
         default=True,
     )
     # extra data group
-    use_edges: BoolProperty(
-        name="Include Edges",
-        description="",
-        default=True,
-    )
     use_smooth_groups: BoolProperty(
         name="Smooth Groups",
         description="Write sharp edges as smooth groups",
