@@ -92,16 +92,57 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
 
             fw("\nnewmtl %s\n" % mtl_mat_name)  # Define a new material: matname_imgname
 
+            image = None
+
+            # Attempt to find an image with PrincipledBSDFWrapper
+
             mat_wrap = node_shader_utils.PrincipledBSDFWrapper(mat) if mat else None
 
             if mat_wrap:
                 tex_wrap = getattr(mat_wrap, "base_color_texture", None)
-                if tex_wrap is None:
-                    continue
-                image = tex_wrap.image
-                if image is None:
-                    continue
+                if tex_wrap is not None:
+                    image = tex_wrap.image
 
+            # Attempt to find an image by exploring all nodes leading to output nodes
+            # If several images are found,
+            # use the image whose lower-case name comes first in lexical order
+
+            if image is None and mat.use_nodes:
+                # nodes to explore next (start from output nodes)
+                next_explore_nodes = [
+                    node
+                    for node in mat.node_tree.nodes
+                    if node.bl_idname == "ShaderNodeOutputMaterial"
+                ]
+                # nodes that were already explored
+                explored_nodes = []
+                # images from all explored image nodes
+                images = []
+
+                while next_explore_nodes:
+                    explore_node = next_explore_nodes.pop()
+
+                    if explore_node in explored_nodes:
+                        continue
+
+                    if explore_node.bl_idname == "ShaderNodeTexImage":
+                        if explore_node.image is not None:
+                            images.append(explore_node.image)
+
+                    # add nodes linking to the inputs of the node being explored,
+                    # to the list of nodes to explore next
+                    for explore_node_input in explore_node.inputs.values():
+                        # Note: accessing node links like this is O(all links amount)
+                        for explore_node_input_link in explore_node_input.links:
+                            next_explore_nodes.append(explore_node_input_link.from_node)
+
+                    explored_nodes.append(explore_node)
+
+                if images:
+                    images.sort(key=lambda img: img.name.lower())
+                    image = images[0]
+
+            if image is not None:
                 filepath = io_utils.path_reference(
                     image.filepath,
                     source_dir,
