@@ -120,6 +120,7 @@ def write_file(
     depsgraph,
     scene,
     EXPORT_NORMALS=False,
+    EXPORT_VERTEX_COLORS=False,
     EXPORT_UV=True,
     EXPORT_MTL=True,
     EXPORT_APPLY_MODIFIERS=True,
@@ -188,7 +189,7 @@ def write_file(
                 fw("mtllib %s\n" % repr(os.path.basename(mtlfilepath))[1:-1])
 
             # Initialize totals, these are updated each object
-            totverts = totuvco = totno = 1
+            totverts = totuvco = totno = totvc = 1
 
             face_vert_index = 1
 
@@ -224,8 +225,8 @@ def write_file(
 
                 subprogress1.enter_substeps(len(obs))
                 for ob, ob_mat in obs:
-                    with ProgressReportSubstep(subprogress1, 6) as subprogress2:
-                        uv_unique_count = no_unique_count = 0
+                    with ProgressReportSubstep(subprogress1, 7) as subprogress2:
+                        uv_unique_count = no_unique_count = vc_unique_count = 0
 
                         ob_for_convert = (
                             ob.evaluated_get(depsgraph)
@@ -258,6 +259,11 @@ def write_file(
                             faceuv = False
 
                         me_verts = me.vertices[:]
+
+                        if EXPORT_VERTEX_COLORS and me.vertex_colors.active is not None:
+                            vertex_colors_data = me.vertex_colors.active.data[:]
+                        else:
+                            vertex_colors_data = None
 
                         # Make our own list so it can be sorted to reduce context switching
                         face_index_pairs = [
@@ -384,6 +390,27 @@ def write_file(
                             del normals_to_idx, no_get, no_key, no_val
                         else:
                             loops_to_normals = []
+
+                        subprogress2.step()
+
+                        # vertex colors
+                        if vertex_colors_data is not None:
+                            vc_key = vc_val = None
+                            colors_to_idx = {}
+                            vc_get = colors_to_idx.get
+                            loops_to_colors = [0] * len(loops)
+                            for f, f_index in face_index_pairs:
+                                for l_idx in f.loop_indices:
+                                    vc_key = vertex_colors_data[l_idx].color[:]
+                                    vc_val = vc_get(vc_key)
+                                    if vc_val is None:
+                                        vc_val = colors_to_idx[vc_key] = vc_unique_count
+                                        fw("vc %.4f %.4f %.4f %.4f\n" % vc_key)
+                                        vc_unique_count += 1
+                                    loops_to_colors[l_idx] = vc_val
+                            del colors_to_idx, vc_get, vc_key, vc_val
+                        else:
+                            loops_to_colors = []
 
                         subprogress2.step()
 
@@ -535,12 +562,19 @@ def write_file(
 
                             fw("\n")
 
+                            if vertex_colors_data is not None:
+                                fw("fc")
+                                for vi, v, li in f_v:
+                                    fw(" %d" % (totvc + loops_to_colors[li]))
+                                fw("\n")
+
                         subprogress2.step()
 
                         # Make the indices global rather then per mesh
                         totverts += len(me_verts)
                         totuvco += uv_unique_count
                         totno += no_unique_count
+                        totvc += vc_unique_count
 
                         # clean up
                         ob_for_convert.to_mesh_clear()
@@ -564,6 +598,7 @@ def _write(
     context,
     filepath,
     EXPORT_NORMALS,  # ok
+    EXPORT_VERTEX_COLORS,
     EXPORT_UV,  # ok
     EXPORT_MTL,
     EXPORT_APPLY_MODIFIERS,  # ok
@@ -597,6 +632,7 @@ def _write(
             depsgraph,
             scene,
             EXPORT_NORMALS,
+            EXPORT_VERTEX_COLORS,
             EXPORT_UV,
             EXPORT_MTL,
             EXPORT_APPLY_MODIFIERS,
@@ -623,6 +659,7 @@ def save(
     filepath,
     *,
     use_normals=False,
+    use_vertex_colors=False,
     use_uvs=True,
     use_materials=True,
     use_mesh_modifiers=True,
@@ -639,6 +676,7 @@ def save(
         context,
         filepath,
         EXPORT_NORMALS=use_normals,
+        EXPORT_VERTEX_COLORS=use_vertex_colors,
         EXPORT_UV=use_uvs,
         EXPORT_MTL=use_materials,
         EXPORT_APPLY_MODIFIERS=use_mesh_modifiers,
@@ -685,6 +723,11 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
     use_normals: BoolProperty(
         name="Write Normals",
         description="Export one normal per vertex and per face, to represent flat faces and sharp edges",
+        default=True,
+    )
+    use_vertex_colors: BoolProperty(
+        name="Write Vertex Colors",
+        description="Export one color per vertex and per face, including vertex alpha",
         default=True,
     )
     use_uvs: BoolProperty(
@@ -840,6 +883,7 @@ class EXPORT_OBJ_SO_PT_export_geometry(bpy.types.Panel):
 
         layout.prop(operator, "use_mesh_modifiers")
         layout.prop(operator, "use_normals")
+        layout.prop(operator, "use_vertex_colors")
         layout.prop(operator, "use_uvs")
         layout.prop(operator, "use_materials")
         layout.prop(operator, "use_vertex_groups")
