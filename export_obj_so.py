@@ -167,6 +167,7 @@ def write_file(
     EXPORT_APPLY_MODIFIERS=True,
     EXPORT_GROUP_BY_OB=True,
     EXPORT_GROUP_BY_MAT=False,
+    EXPORT_GROUP_NAME_USE_COLLECTION=True,
     EXPORT_KEEP_VERT_ORDER=False,
     EXPORT_POLYGROUPS=False,
     EXPORT_GLOBAL_MATRIX=None,
@@ -254,6 +255,44 @@ def write_file(
                 }:
                     subprogress1.step("Ignoring %s, dupli child..." % ob_main.name)
                     continue
+
+                if EXPORT_GROUP_NAME_USE_COLLECTION:
+                    next_explore_collections = [scene.collection]
+                    explored_collections = []
+                    parent_collections = []
+
+                    while next_explore_collections:
+                        explore_collection = next_explore_collections.pop()
+
+                        if explore_collection in explored_collections:
+                            continue
+
+                        if (
+                            explore_collection != scene.collection
+                            and ob_main in explore_collection.all_objects.values()
+                        ):
+                            parent_collections.append(explore_collection)
+
+                        next_explore_collections.extend(
+                            reversed(explore_collection.children.values())
+                        )
+
+                        explored_collections.append(explore_collection)
+
+                    obj_group_name_collection_prefix = ""
+                    prev_collection = None
+
+                    for collection in parent_collections:
+                        if prev_collection is not None:
+                            obj_group_name_collection_prefix += "#"
+                            if collection in prev_collection.children.values():
+                                obj_group_name_collection_prefix += "."
+                            else:
+                                obj_group_name_collection_prefix += "_"
+
+                        obj_group_name_collection_prefix += name_compat(collection.name)
+
+                        prev_collection = collection
 
                 obs = [(ob_main, ob_main.matrix_world)]
                 if ob_main.is_instancer:
@@ -349,18 +388,20 @@ def write_file(
                             0,
                         )  # Can never be this, so we will label a new material the first chance we get.
 
-                        if EXPORT_GROUP_BY_OB:
-                            name1 = ob.name
-                            name2 = ob.data.name
-                            if name1 == name2:
-                                obnamestring = name_compat(name1)
-                            else:
-                                obnamestring = "%s_%s" % (
-                                    name_compat(name1),
-                                    name_compat(name2),
-                                )
+                        obj_group_name_base = name_compat(ob.name)
 
-                            fw("g %s\n" % obnamestring)
+                        if ob.data.name != ob.name:
+                            obj_group_name_base += "#__" + name_compat(ob.data.name)
+
+                        if EXPORT_GROUP_NAME_USE_COLLECTION:
+                            obj_group_name_base = (
+                                obj_group_name_collection_prefix
+                                + "#__"
+                                + obj_group_name_base
+                            )
+
+                        if EXPORT_GROUP_BY_OB:
+                            fw("g %s\n" % obj_group_name_base)
 
                         subprogress2.step()
 
@@ -485,7 +526,13 @@ def write_file(
                                     vgroup_of_face = findVertexGroupName(f, vgroupsMap)
                                     if vgroup_of_face != currentVGroup:
                                         currentVGroup = vgroup_of_face
-                                        fw("g %s\n" % vgroup_of_face)
+                                        fw(
+                                            "g %s#__%s\n"
+                                            % (
+                                                obj_group_name_base,
+                                                name_compat(vgroup_of_face),
+                                            )
+                                        )
 
                             # CHECK FOR CONTEXT SWITCH
                             if key == contextMat:
@@ -495,13 +542,7 @@ def write_file(
                                     # Write a null material, since we know the context has changed.
                                     if EXPORT_GROUP_BY_MAT:
                                         # can be mat_image or (null)
-                                        fw(
-                                            "g %s_%s\n"
-                                            % (
-                                                name_compat(ob.name),
-                                                name_compat(ob.data.name),
-                                            )
-                                        )
+                                        fw("g %s\n" % obj_group_name_base)
                                     if EXPORT_MTL:
                                         fw("usemtl (null)\n")  # mat, image
 
@@ -542,10 +583,9 @@ def write_file(
                                     if EXPORT_GROUP_BY_MAT:
                                         # can be mat_image or (null)
                                         fw(
-                                            "g %s_%s_%s\n"
+                                            "g %s#__%s\n"
                                             % (
-                                                name_compat(ob.name),
-                                                name_compat(ob.data.name),
+                                                obj_group_name_base,
                                                 mat_data[0],
                                             )
                                         )
@@ -645,6 +685,7 @@ def _write(
     EXPORT_APPLY_MODIFIERS,  # ok
     EXPORT_GROUP_BY_OB,
     EXPORT_GROUP_BY_MAT,
+    EXPORT_GROUP_NAME_USE_COLLECTION,
     EXPORT_KEEP_VERT_ORDER,
     EXPORT_POLYGROUPS,
     EXPORT_SEL_ONLY,  # ok
@@ -679,6 +720,7 @@ def _write(
             EXPORT_APPLY_MODIFIERS,
             EXPORT_GROUP_BY_OB,
             EXPORT_GROUP_BY_MAT,
+            EXPORT_GROUP_NAME_USE_COLLECTION,
             EXPORT_KEEP_VERT_ORDER,
             EXPORT_POLYGROUPS,
             EXPORT_GLOBAL_MATRIX,
@@ -706,6 +748,7 @@ def save(
     use_mesh_modifiers=True,
     group_by_object=True,
     group_by_material=False,
+    group_name_use_collection=True,
     keep_vertex_order=False,
     use_vertex_groups=False,
     use_selection=True,
@@ -723,6 +766,7 @@ def save(
         EXPORT_APPLY_MODIFIERS=use_mesh_modifiers,
         EXPORT_GROUP_BY_OB=group_by_object,
         EXPORT_GROUP_BY_MAT=group_by_material,
+        EXPORT_GROUP_NAME_USE_COLLECTION=group_name_use_collection,
         EXPORT_KEEP_VERT_ORDER=keep_vertex_order,
         EXPORT_POLYGROUPS=use_vertex_groups,
         EXPORT_SEL_ONLY=use_selection,
@@ -798,6 +842,11 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
         description="Generate an OBJ group for each part of a geometry using a different material",
         default=False,
     )
+    group_name_use_collection: BoolProperty(
+        name="Collection in Group Name",
+        description="Put the collections the object belongs to in the OBJ group name",
+        default=True,
+    )
     keep_vertex_order: BoolProperty(
         name="Keep Vertex Order",
         description="",
@@ -871,6 +920,7 @@ class EXPORT_OBJ_SO_PT_export_include(bpy.types.Panel):
         col = layout.column(heading="Objects as", align=True)
         col.prop(operator, "group_by_object")
         col.prop(operator, "group_by_material")
+        col.prop(operator, "group_name_use_collection")
 
 
 class EXPORT_OBJ_SO_PT_export_transform(bpy.types.Panel):
