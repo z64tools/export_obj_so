@@ -107,7 +107,7 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
             # If several images are found,
             # use the image whose lower-case name comes first in lexical order
 
-            if image is None and mat.use_nodes:
+            if image is None and mat and mat.use_nodes:
                 # nodes to explore next (start from output nodes)
                 next_explore_nodes = [
                     node
