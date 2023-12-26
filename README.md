@@ -1,3 +1,5 @@
+This addon is outdated, it has been supplanted by https://github.com/z64tools/io_export_so2
+
 # export_obj_so
 
 This is a .obj exporter aimed at exporting for SharpOcarina, for Zelda64 modding.
